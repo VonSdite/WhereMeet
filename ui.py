@@ -13,9 +13,9 @@ class Ui(QWidget):
 
     def __init__(self, configFile='config.txt'):
         super(Ui, self).__init__()
-        self.wechatTarget = 'Anti Cpp Cpp b'         # 微信发送信息的目标
+        self.wechatTarget = 'Anti Cpp Cpp Club'         # 微信发送信息的目标
         self.configFile = configFile                    # Ui的配置文件，配置桌子
-        self.openPrice = getOpenPrice(self)                 # 开盘价
+        self.openPrice = getOpenPrice(self)             # 开盘价
         self.row, self.col = resRowCol(self.openPrice)  # 目标结果行和列
         self.initUI()
 
@@ -127,15 +127,14 @@ class Ui(QWidget):
             try:
                 room_name = itchat.search_chatrooms(name=self.wechatTarget)[0]['UserName']
             except IndexError:
+                itchat.logout()
                 QMessageBox.question(self, 'Message',\
                  "没有这个群聊，消息无法发送",\
                              QMessageBox.Ok, QMessageBox.Ok)
                 return
 
             itchat.send("聚会位置：第%d行 第%d列" % (self.row, self.col), room_name)
-
-            itchat.run()
-            itchat.dump_login_status()
+            itchat.logout()
         except:
             QMessageBox.question(self, 'Message', "网络异常, 无法发送微信消息",
                                  QMessageBox.Ok, QMessageBox.Ok)
