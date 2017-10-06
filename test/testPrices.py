@@ -102,6 +102,5 @@ if __name__ == '__main__':
     # print(prices)
 
     # findNiceDeviation(prices, 1, 100000)
-    # showRO(prices, 1516)        # 显示散点图
-    showRO(prices, 27666)
+    showRO(prices, 0)       # 显示散点图
 
