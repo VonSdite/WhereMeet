@@ -6,7 +6,12 @@ from PyQt5 import QtGui
 
 from make_map import resRowCol
 from stock_price import getOpenPrice
-import itchat
+import itchat, sys, os
+import threading
+
+class Signal(QObject):
+    # 信号
+    e = pyqtSignal()
 
 class Ui(QWidget):
     """docstring for Quit"""
@@ -19,6 +24,16 @@ class Ui(QWidget):
         self.row, self.col = resRowCol(self.openPrice)  # 目标结果行和列
         self.initUI()
 
+        # 微信发送信息线程
+        self.wechatThreading = threading.Thread(target=self.wechatSendMessage)  
+        self.wechatThreading.setDaemon(True)
+
+        # 信号-槽
+        self.networkErrorCatch = Signal()       # 微信网络异常信号
+        self.networkErrorCatch.e.connect(self.networkError)
+        self.notFindErrorCatch = Signal()       # 微信群组查找不到异常
+        self.notFindErrorCatch.e.connect(self.notFindError)
+
     def initUI(self):
         # 设置背景图片
         bk = QLabel(self)
@@ -27,11 +42,18 @@ class Ui(QWidget):
         pixMap = QPixmap('img/bk.jpg').scaled(bk.width(), bk.height())
         bk.setPixmap(pixMap)
 
+        dateLabel = QLabel(self)
+        dateLabel.setText('<font color=white><b>最新 %s</b></font>' %\
+                     '-'.join(self.openPrice.split('-')[:-1]))
+        dateLabel.setFont(QFont('宋体', 20))
+        dateLabel.move(560, 30)
+
         priceLabel = QLabel(self)
-        priceLabel.setText('<font color=white><b>今日股票开盘价%s元</b></font>' \
+        priceLabel.setText('<font color=white><b>股票开盘价%s元</b></font>' \
                            % self.openPrice.split('-')[-1])
         priceLabel.setFont(QFont('宋体', 20))
-        priceLabel.move(530, 30)
+        priceLabel.move(560, 80)
+
 
         self.resTable = None            # 目标位置对象
         self.resTableColor = None       # 目标位置桌子颜色
@@ -81,7 +103,6 @@ class Ui(QWidget):
 
                 row += 40       # 下一行放置的位置
 
-
         btn = QPushButton('点我', self)
         btn.setIcon(QIcon(r'img\button.gif'))
         btn.resize(80, 40)
@@ -110,34 +131,102 @@ class Ui(QWidget):
         targetLabel.move(530, 130)
         targetLabel.show()
 
-        sendButton = QPushButton('发送到微信', self)
+        self.sendButton = QPushButton('发送到微信', self)
 
-        sendButton.setIcon(QIcon(r'img\wechat.jpg'))
-        sendButton.resize(130, 40)
-        sendButton.move(750, 690)
-        sendButton.clicked.connect(self.sendMessage)
-        sendButton.show()
+        self.sendButton.setIcon(QIcon(r'img\wechat.jpg'))
+        self.sendButton.resize(130, 40)
+        self.sendButton.move(750, 690)
+        self.sendButton.clicked.connect(self.sendMessage)
+        self.sendButton.show()
 
     def sendMessage(self):
-        QMessageBox.question(self, 'Message', "点了必须登录, 不然会陷入死等, 网络异常除外",\
-                             QMessageBox.Ok, QMessageBox.Ok)
-        try:
-            itchat.auto_login(hotReload=True)
+        self.wechatThreading.start()
+        
+        # 线程只能用一次，所以重新创建
+        self.wechatThreading = threading.Thread(target=self.wechatSendMessage)  
+        self.wechatThreading.setDaemon(True)
 
+    def networkError(self):
+        q = QMessageBox(self)
+        q.setText("网络异常, 无法发送微信消息")
+        q.show()
+
+    def notFindError(self):
+        q = QMessageBox(self)
+        q.setText("没有这个群聊，消息无法发送")
+        q.show()        
+
+    def wechatLogin(self):
+        # 重写微信登录函数
+        # 由于itchat自动登录 虽然异常处理我都捕获并处理了
+        # 但是还是存在当我网络正常，但是不想登录或者不想扫二维码而把二维码关闭时
+        # 此时wechat发消息这个线程是陷入死循环的，是一直等待你去登录微信
+        # 如果只是一条线程倒是无所谓， 但是你多次按了微信发送消息的按钮，却不登录
+        # 会开了很多条线程，十分浪费系统资源
+        # 所以重写了itchat登录的过程
+        def output_info(msg):
+            print('[INFO] %s' % msg)
+
+        def open_QR():
+            for get_count in range(10):
+                # output_info('Getting uuid')
+                uuid = itchat.get_QRuuid()
+                while uuid is None: 
+                    uuid = itchat.get_QRuuid()
+                # output_info('Getting QR Code')
+                if itchat.get_QR(uuid): break
+                elif get_count >= 9:
+                    output_info('Failed to get QR Code, please restart the program')
+                    sys.exit()
+            output_info('Please scan the QR Code')
+            return uuid
+
+        uuid = open_QR()
+        waitForConfirm = False
+        while True:
+            # 循环至登录或者status == '408'
+            status = itchat.check_login(uuid)
+            if status == '200':
+                break
+            elif status == '201':
+                if not waitForConfirm:
+                    output_info('Please press confirm')
+                    waitForConfirm = True
+            elif status == '408':
+                os.system('del QR.png')
+                sys.exit()
+
+        userInfo = itchat.web_init()
+        itchat.show_mobile_login()
+        itchat.get_contact()
+        itchat.start_receiving()
+        output_info("Successful login")
+        os.system('del QR.png')
+
+
+    def wechatSendMessage(self):
+        try:
+            self.wechatLogin()
             try:
                 room_name = itchat.search_chatrooms(name=self.wechatTarget)[0]['UserName']
             except IndexError:
                 itchat.logout()
-                QMessageBox.question(self, 'Message',\
-                 "没有这个群聊，消息无法发送",\
-                             QMessageBox.Ok, QMessageBox.Ok)
+                self.notFindErrorCatch.e.emit()
                 return
 
-            itchat.send("聚会位置：第%d行 第%d列" % (self.row, self.col), room_name)
+            if self.openPrice.split('-')[-1] == '0':
+                itchat.send('股票可能还未开盘，或者股票获取失败', room_name)
+            else:
+                itchat.send("最新股价%s %s元\n\n聚会位置：第%d行 第%d列 :)" % \
+                    ('-'.join(self.openPrice.split('-')[:-1]),\
+                     self.openPrice.split('-')[-1], \
+                     self.row, \
+                     self.col), \
+                        room_name)
             itchat.logout()
-        except:
-            QMessageBox.question(self, 'Message', "网络异常, 无法发送微信消息",
-                                 QMessageBox.Ok, QMessageBox.Ok)
+        except Exception as e:
+            print(e)
+            self.networkErrorCatch.e.emit()
 
     def center(self):
 
