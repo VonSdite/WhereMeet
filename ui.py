@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5 import QtGui
+from PyQt5 import QtCore
 
 from make_map import resRowCol
 from stock_price import getOpenPrice
@@ -18,10 +19,13 @@ class Ui(QWidget):
 
     def __init__(self, configFile='config.txt'):
         super(Ui, self).__init__()
+
         self.wechatTarget = 'Anti Cpp Cpp Club'         # 微信发送信息的目标
         self.configFile = configFile                    # Ui的配置文件，配置桌子
         self.openPrice = getOpenPrice(self)             # 开盘价
         self.row, self.col = resRowCol(self.openPrice)  # 目标结果行和列
+
+        self.textSize = 15      # 文字大小
         self.initUI()
 
         # 微信发送信息线程
@@ -36,22 +40,21 @@ class Ui(QWidget):
 
     def initUI(self):
         # 设置背景图片
-        bk = QLabel(self)
-        bk.resize(950, 800)
-        bk.move(0, 0)
-        pixMap = QPixmap('img/bk.jpg').scaled(bk.width(), bk.height())
-        bk.setPixmap(pixMap)
+        palette = QtGui.QPalette()
+        palette.setBrush(self.backgroundRole(), QtGui.QBrush(QtGui.QPixmap('img/bk.jpg')))
+        self.setAutoFillBackground(True)
+        self.setPalette(palette)
 
         dateLabel = QLabel(self)
         dateLabel.setText('<font color=white><b>最新 %s</b></font>' %\
                      '-'.join(self.openPrice.split('-')[:-1]))
-        dateLabel.setFont(QFont('宋体', 20))
+        dateLabel.setFont(QFont('宋体', self.textSize))
         dateLabel.move(560, 30)
 
         priceLabel = QLabel(self)
         priceLabel.setText('<font color=white><b>股票开盘价%s元</b></font>' \
                            % self.openPrice.split('-')[-1])
-        priceLabel.setFont(QFont('宋体', 20))
+        priceLabel.setFont(QFont('宋体', self.textSize))
         priceLabel.move(560, 80)
 
 
@@ -105,7 +108,7 @@ class Ui(QWidget):
 
         btn = QPushButton('点我', self)
         btn.setIcon(QIcon(r'img\button.gif'))
-        btn.resize(80, 40)
+        btn.resize(btn.sizeHint())
         btn.move(600, 690)
         btn.clicked.connect(self.buttonClicked)
 
@@ -113,7 +116,7 @@ class Ui(QWidget):
         self.setWindowIcon(QIcon('img\gathering.jpg'))
         self.resize(950, 800)
         self.center()
-        self.setFixedSize(self.width(), self.height())  # 禁止改变窗口大小
+        # self.setFixedSize(self.width(), self.height())  # 禁止改变窗口大小
         self.show()
 
     def buttonClicked(self):
@@ -127,17 +130,17 @@ class Ui(QWidget):
         targetLabel = QLabel(self)
         targetLabel.setText('<font color=white>聚会位置：第<b>%d</b>行 第<b>%d</b>列</font>'\
                            % (self.row, self.col))
-        targetLabel.setFont(QFont('宋体', 20))
+        targetLabel.setFont(QFont('宋体', self.textSize))
         targetLabel.move(530, 130)
         targetLabel.show()
 
-        self.sendButton = QPushButton('发送到微信', self)
+        sendButton = QPushButton('发送到微信', self)
 
-        self.sendButton.setIcon(QIcon(r'img\wechat.jpg'))
-        self.sendButton.resize(130, 40)
-        self.sendButton.move(750, 690)
-        self.sendButton.clicked.connect(self.sendMessage)
-        self.sendButton.show()
+        sendButton.setIcon(QIcon(r'img\wechat.jpg'))
+        sendButton.resize(sendButton.sizeHint())
+        sendButton.move(750, 690)
+        sendButton.clicked.connect(self.sendMessage)
+        sendButton.show()
 
     def sendMessage(self):
         self.wechatThreading.start()
