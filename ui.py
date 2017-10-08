@@ -38,10 +38,15 @@ class Ui(QWidget):
         self.notFindErrorCatch = Signal()       # 微信群组查找不到异常
         self.notFindErrorCatch.e.connect(self.notFindError)
 
+        # 是否已经点了生成座位的button
+        # 点了的话，就不重新运行，避免创建多余的线程
+        self.isClicked = False
+
     def initUI(self):
         # 设置背景图片
         palette = QtGui.QPalette()
-        palette.setBrush(self.backgroundRole(), QtGui.QBrush(QtGui.QPixmap('img/bk.jpg')))
+        # palette.setBrush(self.backgroundRole(), QtGui.QBrush(QtGui.QPixmap('img/bk.jpg')))
+        palette.setBrush(self.backgroundRole(), QtGui.QBrush(QColor(0,0,0)))
         self.setAutoFillBackground(True)
         self.setPalette(palette)
 
@@ -60,7 +65,6 @@ class Ui(QWidget):
 
         self.resTable = None            # 目标位置对象
         self.resTableColor = None       # 目标位置桌子颜色
-        self.resTablePos = None
         # 根据桌子配置文件来配置桌子
         with open(self.configFile, 'r', encoding='utf-8') as f:
             lines = f.readlines()
@@ -94,15 +98,14 @@ class Ui(QWidget):
                         break
                     cnt_col += 1
                     d = QLabel(self)
-                    d.resize(40, 25)
-                    pixMap = QPixmap('img/%s.jpg' % e).scaled(d.width(), d.height())
+                    d.resize(60, 40)
+                    pixMap = QPixmap('img/%s.png' % e).scaled(d.width(), d.height())
                     d.move(col, row)
                     d.setPixmap(pixMap)
 
                     if cnt_row == self.row and cnt_col == self.col:
                         self.resTable = d
                         self.resTableColor = e
-                        self.resTablePos = (row, col)
 
                 row += 40       # 下一行放置的位置
 
@@ -114,33 +117,57 @@ class Ui(QWidget):
 
         self.setWindowTitle('WhereMeet?')
         self.setWindowIcon(QIcon('img\gathering.jpg'))
-        self.resize(950, 800)
+        self.resize(950, 830)
         self.center()
         # self.setFixedSize(self.width(), self.height())  # 禁止改变窗口大小
         self.show()
 
+    def signalShow(self):
+        # 选中的桌子的显示
+        # 通过showBoolean来设置显示什么图片
+        if self.showBoolean:
+            self.resTable.setPixmap(QPixmap(None))
+            self.showBoolean = False
+        else:
+            pixMap = QPixmap('img/%s.png' % self.resTableColor).scaled(\
+                self.resTable.width(), self.resTable.height())
+            self.resTable.setPixmap(pixMap)
+            self.showBoolean = True
+
+    def showPic(self):
+        # 显示选中桌子闪烁的计时器线程
+        self.showPicSignal.e.emit()
+        self.timer = threading.Timer(0.5, self.showPic)
+        self.timer.start()
+
+
     def buttonClicked(self):
-        self.resTable.resize(40, 110)
-        self.resTable.move(self.resTablePos[1], self.resTablePos[0]-85)
-        pixMap = QPixmap('img/%s_selected.jpg' % self.resTableColor).scaled(\
-                                                            self.resTable.width(),\
-                                                            self.resTable.height())
-        self.resTable.setPixmap(pixMap)
+        if not self.isClicked:
+            # 避免创建多余的线程
+            self.isClicked = True
 
-        targetLabel = QLabel(self)
-        targetLabel.setText('<font color=white>聚会位置：第<b>%d</b>行 第<b>%d</b>列</font>'\
-                           % (self.row, self.col))
-        targetLabel.setFont(QFont('宋体', self.textSize))
-        targetLabel.move(530, 130)
-        targetLabel.show()
+            # 通过线程timer来实现桌子闪烁
+            # 使用QMoive的话，图片会带有锯齿，所以放弃使用该方法，转而使用线程计时器
+            self.showPicSignal = Signal()
+            self.showBoolean = True
+            self.showPicSignal.e.connect(self.signalShow)
+            self.timer = threading.Timer(0.5, self.showPic)
+            self.timer.start()
 
-        sendButton = QPushButton('发送到微信', self)
+            targetLabel = QLabel(self)
+            targetLabel.setText('<font color=white>聚会位置：第<b>%d</b>行 第<b>%d</b>列</font>'\
+                               % (self.row, self.col))
+            targetLabel.setFont(QFont('宋体', self.textSize))
+            targetLabel.move(530, 130)
+            targetLabel.show()
 
-        sendButton.setIcon(QIcon(r'img\wechat.jpg'))
-        sendButton.resize(sendButton.sizeHint())
-        sendButton.move(750, 690)
-        sendButton.clicked.connect(self.sendMessage)
-        sendButton.show()
+            sendButton = QPushButton('发送到微信', self)
+
+            sendButton.setIcon(QIcon(r'img\wechat.jpg'))
+            sendButton.resize(sendButton.sizeHint())
+            sendButton.move(750, 690)
+            sendButton.clicked.connect(self.sendMessage)
+            sendButton.show()
 
     def sendMessage(self):
         self.wechatThreading.start()
