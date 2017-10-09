@@ -2,7 +2,7 @@
 # __Author__: Sdite
 # __Email__ : a122691411@gmail.com
 
-from ui import Ui
+from ui import *
 from PyQt5.QtWidgets import QApplication
 import sys
 
