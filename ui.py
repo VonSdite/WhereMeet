@@ -7,6 +7,7 @@ from PyQt5 import QtCore
 
 from make_map import resRowCol
 from stock_price import getOpenPrice
+from rp import *
 import itchat, sys, os
 import threading
 
@@ -25,7 +26,23 @@ class Ui(QWidget):
         self.openPrice = getOpenPrice(self)             # 开盘价
         self.row, self.col = resRowCol(self.openPrice)  # 目标结果行和列
 
-        self.textSize = 15      # 文字大小
+        # 常量在rp.py中定义了
+        # 解决了分辨率自适应问题
+        self.textSize = TEXTSIZE                        # 文字大小
+        self.dateLabelPos =  DATELABELPOS               # 时间Label的位置
+        self.priceLabelPos = PRICELABELPOS              # 开盘价的位置
+        self.resultLabelPos = RESULTLABELPOS            # 结果的位置
+        self.buttonTextSize = BUTTONTEXTSIZE            # 按钮文字大小
+        self.buttonIconSize = BUTTONICONSIZE            # 按钮图标大小
+        self.buttonPos = BUTTONPOS                      # '点我'按钮的起始位置
+        self.sendButtonPos = SENDBUTTONPOS              # 发送信息按钮的起始位置
+        self.backgroundSize = BACKGROUNDSIZE            # 窗口大小，背景图片大小
+        self.tableSize = TABLESIZE                      # 桌子的大小
+        self.colInterval = COLINTERVAL                  # 桌子间列的间隔
+        self.rowInterval = ROWINTERVAL                  # 桌子间行的间隔
+        self.rowStart = ROWSTART                        # 桌子的起始行位置
+        self.colStart = COLSTART                        # 桌子的起始列位置
+
         self.initUI()
 
         # 微信发送信息线程
@@ -45,8 +62,9 @@ class Ui(QWidget):
     def initUI(self):
         # 设置背景图片
         palette = QtGui.QPalette()
-        # palette.setBrush(self.backgroundRole(), QtGui.QBrush(QtGui.QPixmap('img/bk.jpg')))
-        palette.setBrush(self.backgroundRole(), QtGui.QBrush(QColor(0,0,0)))
+        pic = QtGui.QPixmap('img/bk.jpg').scaled(*self.backgroundSize)
+        palette.setBrush(self.backgroundRole(), QtGui.QBrush(pic))
+        # palette.setBrush(self.backgroundRole(), QtGui.QBrush(QColor(0, 0, 0)))
         self.setAutoFillBackground(True)
         self.setPalette(palette)
 
@@ -54,13 +72,13 @@ class Ui(QWidget):
         dateLabel.setText('<font color=white><b>最新 %s</b></font>' %\
                      '-'.join(self.openPrice.split('-')[:-1]))
         dateLabel.setFont(QFont('宋体', self.textSize))
-        dateLabel.move(560, 30)
+        dateLabel.move(*self.dateLabelPos)
 
         priceLabel = QLabel(self)
         priceLabel.setText('<font color=white><b>股票开盘价%s元</b></font>' \
                            % self.openPrice.split('-')[-1])
         priceLabel.setFont(QFont('宋体', self.textSize))
-        priceLabel.move(560, 80)
+        priceLabel.move(*self.priceLabelPos)
 
 
         self.resTable = None            # 目标位置对象
@@ -70,10 +88,10 @@ class Ui(QWidget):
             lines = f.readlines()
             self.row %= len(lines)
 
-            cnt_row = 0         # 计数到第几行
-            row = 40            # 放置的起始行的位置
+            cnt_row = 0                    # 计数到第几行
+            row = self.rowStart            # 放置的起始行的位置
             for line in lines:
-                col = 10  # 放置的起始列的位置
+                col = self.colStart        # 放置的起始列的位置
                 ########################################
                 # 这块代码是用于self.col
                 cnt_row += 1
@@ -88,17 +106,18 @@ class Ui(QWidget):
                         if e != ' ' and e != '\n':
                             cnt += 1
                     self.col %= cnt
+                    self.col += 1
                 ########################################
                 cnt_col = 0
                 for e in line:
                     if e == ' ':
-                        col += 80   # 遇到空格就要空开一定的间隔
+                        col += self.colInterval   # 遇到空格就要空开一定的间隔
                         continue
                     if e == '\n':
                         break
                     cnt_col += 1
                     d = QLabel(self)
-                    d.resize(60, 40)
+                    d.resize(*self.tableSize)
                     pixMap = QPixmap('img/%s.png' % e).scaled(d.width(), d.height())
                     d.move(col, row)
                     d.setPixmap(pixMap)
@@ -107,19 +126,24 @@ class Ui(QWidget):
                         self.resTable = d
                         self.resTableColor = e
 
-                row += 40       # 下一行放置的位置
+                row += self.rowInterval       # 下一行放置的位置
 
+        # 显示聚会位置的button
         btn = QPushButton('点我', self)
+        btn.setStyleSheet('background-color: white')  # 设置button背景颜色
         btn.setIcon(QIcon(r'img\button.gif'))
+        btn.setIconSize(self.buttonIconSize)
+        btn.setFont(QFont('宋体', self.buttonTextSize))
         btn.resize(btn.sizeHint())
-        btn.move(600, 690)
+        btn.move(*self.buttonPos)
         btn.clicked.connect(self.buttonClicked)
 
+        # 显示窗口的标题，图标；设置窗口大小，居中
         self.setWindowTitle('WhereMeet?')
         self.setWindowIcon(QIcon('img\gathering.jpg'))
-        self.resize(950, 830)
+        self.resize(*self.backgroundSize)
         self.center()
-        # self.setFixedSize(self.width(), self.height())  # 禁止改变窗口大小
+        self.setFixedSize(self.width(), self.height())  # 禁止改变窗口大小
         self.show()
 
     def signalShow(self):
@@ -137,7 +161,7 @@ class Ui(QWidget):
     def showPic(self):
         # 显示选中桌子闪烁的计时器线程
         self.showPicSignal.e.emit()
-        self.timer = threading.Timer(0.5, self.showPic)
+        self.timer = threading.Timer(0.4, self.showPic)
         self.timer.start()
 
 
@@ -151,21 +175,25 @@ class Ui(QWidget):
             self.showPicSignal = Signal()
             self.showBoolean = True
             self.showPicSignal.e.connect(self.signalShow)
-            self.timer = threading.Timer(0.5, self.showPic)
+            self.timer = threading.Timer(0.4, self.showPic)
             self.timer.start()
 
+            # 显示聚会位置的Label
             targetLabel = QLabel(self)
             targetLabel.setText('<font color=white>聚会位置：第<b>%d</b>行 第<b>%d</b>列</font>'\
                                % (self.row, self.col))
             targetLabel.setFont(QFont('宋体', self.textSize))
-            targetLabel.move(530, 130)
+            targetLabel.move(*self.resultLabelPos)
             targetLabel.show()
 
+            # 发送微信消息的Button
             sendButton = QPushButton('发送到微信', self)
-
+            sendButton.setStyleSheet('background-color: white')     # 设置button背景颜色
+            sendButton.setFont(QFont('宋体', self.buttonTextSize))
+            sendButton.setIconSize(self.buttonIconSize)
             sendButton.setIcon(QIcon(r'img\wechat.jpg'))
             sendButton.resize(sendButton.sizeHint())
-            sendButton.move(750, 690)
+            sendButton.move(*self.sendButtonPos)
             sendButton.clicked.connect(self.sendMessage)
             sendButton.show()
 
