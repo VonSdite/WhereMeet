@@ -87,6 +87,7 @@ class Ui(QWidget):
         with open(self.configFile, 'r', encoding='utf-8') as f:
             lines = f.readlines()
             self.row %= len(lines)
+            self.row += 1
 
             cnt_row = 0                    # 计数到第几行
             row = self.rowStart            # 放置的起始行的位置
@@ -180,8 +181,8 @@ class Ui(QWidget):
 
             # 显示聚会位置的Label
             targetLabel = QLabel(self)
-            targetLabel.setText('<font color=white>聚会位置：第<b>%d</b>行 第<b>%d</b>列</font>'\
-                               % (self.row, self.col))
+            targetLabel.setText('<font color=white>聚会位置：第<b>%d</b>行 第<b>%d</b>列</font>' \
+                                % (self.row, self.col))
             targetLabel.setFont(QFont('宋体', self.textSize))
             targetLabel.move(*self.resultLabelPos)
             targetLabel.show()
@@ -273,7 +274,8 @@ class Ui(QWidget):
                 return
 
             if self.openPrice.split('-')[-1] == '0':
-                itchat.send('股票可能还未开盘，或者股票获取失败', room_name)
+                itchat.send('股票可能还未开盘或休市，或者股票获取失败\n\n\
+聚会位置：第%d行 第%d列 :)' % (self.row, self.col), room_name)
             else:
                 itchat.send("最新股价%s %s元\n\n聚会位置：第%d行 第%d列 :)" % \
                     ('-'.join(self.openPrice.split('-')[:-1]),\
